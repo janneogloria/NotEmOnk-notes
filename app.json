@@ -1,0 +1,33 @@
+{
+  "expo": {
+    "name": "NotEmOnk",
+    "slug": "notemOnk",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "light",
+    "splash": {
+      "image": "./assets/splash-icon.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#F5F2EE"
+    },
+    "ios": {
+      "supportsTablet": false,
+      "bundleIdentifier": "com.notemOnk.app"
+    },
+    "android": {
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/adaptive-icon.png",
+        "backgroundColor": "#F5F2EE"
+      },
+      "package": "com.notemOnk.app"
+    },
+    "web": {
+      "bundler": "metro",
+      "favicon": "./assets/favicon.png",
+      "name": "NotEmOnk",
+      "shortName": "NotEmOnk",
+      "description": "A versatile note-taking app for everyone"
+    }
+  }
+}
