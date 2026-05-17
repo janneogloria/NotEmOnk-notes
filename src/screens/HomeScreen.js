@@ -24,6 +24,7 @@ export default function HomeScreen({ navigation }) {
     [...notes].sort((a, b) => (b.updatedAt || 0) - (a.updatedAt || 0)).slice(0, 5);
   const reminders     = ctx.reminders     || [];
   const toggleFavorite = ctx.toggleFavorite || (() => {});
+  const deleteNote     = ctx.deleteNote     || (() => {});
 
   const stats = ctx.stats ?? {
     total:     notes.length,
@@ -167,6 +168,7 @@ export default function HomeScreen({ navigation }) {
                 note={note}
                 onPress={() => navigation.navigate('CreateNote', { note })}
                 onFavorite={() => toggleFavorite(note.id)}
+                onDelete={() => deleteNote(note.id)}
               />
             ))}
           </View>

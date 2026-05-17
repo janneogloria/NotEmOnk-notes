@@ -55,7 +55,7 @@ export default function CreateNoteScreen({ route, navigation }) {
   const [pinned, setPinned]       = useState(existing?.pinned   || false);
   const [favorite, setFavorite]   = useState(existing?.favorite || false);
   const [reminder, setReminder]   = useState(existing?.reminder || null);
-  const [checklist, setChecklist] = useState(existing?.checklist || []);
+  const [checklist, setChecklist] = useState(existing?.checkItems ?? existing?.checklist ?? []);
   const [activeFormat, setActiveFormat] = useState(null);
 
   const [showTagModal,      setShowTagModal]      = useState(false);
@@ -76,7 +76,8 @@ export default function CreateNoteScreen({ route, navigation }) {
       id: existing?.id,
       title: title.trim(),
       content: content.trim(),
-      category, color, tags, pinned, favorite, reminder, checklist,
+      category, color, tags, pinned, favorite, reminder,
+      checkItems: checklist,
     });
     navigation.goBack();
   }, [title, content, category, color, tags, pinned, favorite, reminder, checklist, existing]);
@@ -145,7 +146,7 @@ export default function CreateNoteScreen({ route, navigation }) {
             onPress={() => setShowReminderModal(true)} activeOpacity={0.8}
           >
             <Text style={[styles.chipTxt, reminder && styles.chipTxtFilled]}>
-              {reminder ? `⏰ ${reminder}` : 'Remind'}
+              {reminder ? reminder : 'Remind'}
             </Text>
           </TouchableOpacity>
 
