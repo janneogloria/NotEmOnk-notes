@@ -1,166 +1,147 @@
 import React, { useState } from 'react';
 import {
   View, Text, StyleSheet, ScrollView, TouchableOpacity,
-  SafeAreaView, Platform, Image,
+  SafeAreaView, Platform, TextInput,
 } from 'react-native';
 import { COLORS, RADIUS, SHADOW } from '../constants/theme';
-import icons from '../constants/icons';
-import { TASKS, COMPLETED_TASKS } from '../data/staticData';
+import { useNotes } from '../context/NotesContext';
 
-const FILTER_TABS = ['All Tasks', 'Today', 'Upcoming', 'Completed'];
+const COLOR_HEX = {
+  orange: '#C07850', green: '#7BAB8B', purple: '#8B7BAB',
+  blue: '#7BA7C0',   gold: '#C0A050',  red: '#C07070',
+};
 
-export default function TasksScreen() {
-  const [activeTab, setActiveTab] = useState('All Tasks');
-  const [taskData, setTaskData] = useState(TASKS);
+const TAG_STYLE = {
+  Work:     { bg: '#FFF0E8', color: '#C07850' },
+  School:   { bg: '#E8F5EE', color: '#7BAB8B' },
+  Personal: { bg: '#EEEAF6', color: '#8B7BAB' },
+  Tasks:    { bg: '#E8F0F7', color: '#7BA7C0' },
+  Ideas:    { bg: '#FBF6E8', color: '#C0A050' },
+  Journal:  { bg: '#FFEDED', color: '#C07070' },
+};
 
-  const toggleItem = (taskId, itemId) => {
-    setTaskData(prev =>
-      prev.map(task =>
-        task.id === taskId
-          ? { ...task, items: task.items.map(item => item.id === itemId ? { ...item, done: !item.done } : item) }
-          : task
-      )
-    );
+export default function TasksScreen({ navigation }) {
+  const ctx = useNotes();
+  const allNotes = ctx.notes || [];
+
+  // Works with both old context (no taskNotes) and new context (has taskNotes)
+  const taskNotes = ctx.taskNotes
+    ?? allNotes.filter(n => Array.isArray(n.checkItems) && n.checkItems.length > 0);
+
+  const toggleCheckItem    = ctx.toggleCheckItem    ?? (() => {});
+  const addCheckItemToNote = ctx.addCheckItemToNote ?? (() => {});
+
+  const [addingText, setAddingText] = useState({});
+  const [addingFor,  setAddingFor]  = useState(null);
+
+  const handleAddItem = (noteId) => {
+    const text = (addingText[noteId] || '').trim();
+    if (!text) return;
+    addCheckItemToNote(noteId, text);
+    setAddingText(prev => ({ ...prev, [noteId]: '' }));
+    setAddingFor(null);
   };
-
-  const getProgress = (items) => {
-    const done = items.filter(i => i.done).length;
-    return { done, total: items.length, pct: done / items.length };
-  };
-
-  const totalDone = taskData.reduce((acc, t) => acc + t.items.filter(i => i.done).length, 0);
-  const totalAll  = taskData.reduce((acc, t) => acc + t.items.length, 0);
 
   return (
     <SafeAreaView style={styles.safe}>
-      <ScrollView
-        style={styles.scroll}
-        contentContainerStyle={styles.content}
-        showsVerticalScrollIndicator={false}
-      >
-        {/* Header */}
-        <View style={styles.header}>
-          <View>
-            <Text style={styles.headerTitle}>Tasks</Text>
-            <Text style={styles.headerDate}>Tuesday, April 21, 2026</Text>
-          </View>
-          <View style={styles.headerRight}>
-            <TouchableOpacity style={styles.iconBtn}>
-              <Text style={styles.iconBtnTxt}>...</Text>
-            </TouchableOpacity>
-          </View>
+      <View style={styles.header}>
+        <Text style={styles.screenTitle}>Tasks</Text>
+        <Text style={styles.screenSub}>
+          {taskNotes.length} list{taskNotes.length !== 1 ? 's' : ''}
+        </Text>
+      </View>
+
+      {taskNotes.length === 0 ? (
+        <View style={styles.emptyState}>
+          <Text style={styles.emptyIcon}>☑️</Text>
+          <Text style={styles.emptyTxt}>No task lists yet</Text>
+          <Text style={styles.emptyHint}>Add checklist items to a note to see them here</Text>
+          <TouchableOpacity
+            style={styles.emptyBtn}
+            onPress={() => navigation.navigate('CreateNote', { note: null })}
+            activeOpacity={0.85}
+          >
+            <Text style={styles.emptyBtnTxt}>+ New Note with Tasks</Text>
+          </TouchableOpacity>
         </View>
+      ) : (
+        <ScrollView style={styles.scroll} contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
+          {taskNotes.map(note => {
+            const items    = note.checkItems || [];
+            const done     = items.filter(i => i.done).length;
+            const total    = items.length;
+            const pct      = total > 0 ? Math.round((done / total) * 100) : 0;
+            const accent   = COLOR_HEX[note.color] || COLORS.accent;
+            const tag      = TAG_STYLE[note.category] || TAG_STYLE.Work;
+            const isAdding = addingFor === note.id;
 
-        {/* Progress Banner */}
-        <View style={styles.progressBanner}>
-          <View style={styles.bannerLeft}>
-            <Text style={styles.bannerTitle}>Today's Progress</Text>
-            <Text style={styles.bannerSub}>{totalDone} out of {totalAll} tasks completed</Text>
-            <View style={styles.progTrack}>
-              <View style={[styles.progFill, { width: `${Math.round(totalDone / totalAll * 100)}%` }]} />
-            </View>
-          </View>
-          <View style={styles.bannerRight}>
-            <Text style={styles.bannerPct}>{Math.round(totalDone / totalAll * 100)}%</Text>
-            <Text style={styles.bannerDone}>done</Text>
-          </View>
-        </View>
-
-        {/* Filter Tabs */}
-        <ScrollView
-          horizontal showsHorizontalScrollIndicator={false}
-          style={styles.filterScroll} contentContainerStyle={styles.filterContent}
-        >
-          {FILTER_TABS.map(t => (
-            <TouchableOpacity
-              key={t}
-              style={[styles.filterChip, activeTab === t && styles.filterChipActive]}
-              onPress={() => setActiveTab(t)} activeOpacity={0.8}
-            >
-              <Text style={[styles.filterTxt, activeTab === t && styles.filterTxtActive]}>{t}</Text>
-            </TouchableOpacity>
-          ))}
-        </ScrollView>
-
-        {/* In Progress */}
-        <View style={styles.sectionHeader}>
-          <Text style={styles.sectionLabel}>IN PROGRESS</Text>
-          <Text style={styles.sectionCount}>{taskData.length} active</Text>
-        </View>
-
-        {taskData.map(task => {
-          const prog = getProgress(task.items);
-          return (
-            <View key={task.id} style={styles.taskCard}>
-              <View style={styles.cardHeader}>
-                <Text style={styles.cardTitle}>{task.title}</Text>
-                <View style={[styles.badge, { backgroundColor: task.badgeLight }]}>
-                  <Text style={[styles.badgeTxt, { color: task.badgeColor }]}>{task.badge}</Text>
+            return (
+              <View key={note.id} style={styles.card}>
+                <View style={styles.cardHeader}>
+                  <View style={{ flex: 1 }}>
+                    <TouchableOpacity onPress={() => navigation.navigate('CreateNote', { note })} activeOpacity={0.8}>
+                      <Text style={styles.cardTitle} numberOfLines={1}>{note.title}</Text>
+                    </TouchableOpacity>
+                    <View style={styles.cardMeta}>
+                      <View style={[styles.catBadge, { backgroundColor: tag.bg }]}>
+                        <Text style={[styles.catBadgeTxt, { color: tag.color }]}>{note.category}</Text>
+                      </View>
+                      <Text style={styles.metaDate}>{note.date}</Text>
+                    </View>
+                  </View>
+                  <Text style={[styles.progressPct, { color: accent }]}>{pct}%</Text>
                 </View>
-              </View>
 
-              <View style={styles.cardProgRow}>
-                <Text style={styles.cardProgLbl}>Progress</Text>
-                <Text style={styles.cardProgLbl}>{prog.done} / {prog.total}</Text>
-              </View>
-              <View style={styles.cardProgTrack}>
-                <View style={[
-                  styles.cardProgFill,
-                  { backgroundColor: task.progressColor, width: `${Math.round(prog.pct * 100)}%` }
-                ]} />
-              </View>
+                <View style={styles.progressBarBg}>
+                  <View style={[styles.progressBarFill, { width: `${pct}%`, backgroundColor: accent }]} />
+                </View>
+                <Text style={styles.progressLabel}>{done} of {total} completed</Text>
 
-              {task.items.map(item => (
-                <TouchableOpacity
-                  key={item.id}
-                  style={[styles.checkRow, item.done && styles.checkRowDone]}
-                  onPress={() => toggleItem(task.id, item.id)}
-                  activeOpacity={0.7}
-                >
-                  <View style={[styles.checkbox, item.done && styles.checkboxDone]}>
-                    {item.done && <Text style={styles.checkMark}>✓</Text>}
+                <View style={styles.itemsList}>
+                  {items.map(item => (
+                    <TouchableOpacity
+                      key={item.id} style={styles.itemRow}
+                      onPress={() => toggleCheckItem(note.id, item.id)}
+                      activeOpacity={0.7}
+                    >
+                      <View style={[styles.checkbox, item.done && { backgroundColor: accent, borderColor: accent }]}>
+                        {item.done && <Text style={styles.checkMark}>✓</Text>}
+                      </View>
+                      <Text style={[styles.itemText, item.done && styles.itemTextDone]}>{item.text}</Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+
+                {isAdding ? (
+                  <View style={styles.addInputRow}>
+                    <TextInput
+                      style={styles.addInput}
+                      value={addingText[note.id] || ''}
+                      onChangeText={t => setAddingText(prev => ({ ...prev, [note.id]: t }))}
+                      placeholder="New task…"
+                      placeholderTextColor={COLORS.textMuted}
+                      autoFocus
+                      onSubmitEditing={() => handleAddItem(note.id)}
+                      returnKeyType="done"
+                    />
+                    <TouchableOpacity style={[styles.addConfirmBtn, { backgroundColor: accent }]} onPress={() => handleAddItem(note.id)}>
+                      <Text style={styles.addConfirmTxt}>Add</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity style={styles.addCancelBtn} onPress={() => { setAddingFor(null); setAddingText(prev => ({ ...prev, [note.id]: '' })); }}>
+                      <Text style={styles.addCancelTxt}>✕</Text>
+                    </TouchableOpacity>
                   </View>
-                  <View style={styles.checkBody}>
-                    <Text style={[styles.checkTxt, item.done && styles.checkTxtDone]}>{item.text}</Text>
-                    {!!item.sub && <Text style={styles.checkSub}>{item.sub}</Text>}
-                  </View>
-                </TouchableOpacity>
-              ))}
-
-              <TouchableOpacity style={styles.addItem} activeOpacity={0.7}>
-                <Text style={styles.addItemTxt}>+ Add item…</Text>
-              </TouchableOpacity>
-            </View>
-          );
-        })}
-
-        {/* Completed Today */}
-        <View style={[styles.sectionHeader, { marginTop: 8 }]}>
-          <Text style={styles.sectionLabel}>COMPLETED TODAY</Text>
-          <Text style={[styles.sectionCount, { color: COLORS.green }]}>5 done</Text>
-        </View>
-
-        {COMPLETED_TASKS.map(task => (
-          <View key={task.id} style={[styles.taskCard, { opacity: 0.7 }]}>
-            <View style={styles.cardHeader}>
-              <Text style={styles.cardTitle}>{task.title}</Text>
-              <View style={[styles.badge, { backgroundColor: COLORS.greenLight }]}>
-                <Text style={[styles.badgeTxt, { color: COLORS.green }]}>Done</Text>
+                ) : (
+                  <TouchableOpacity style={styles.addItemBtn} onPress={() => setAddingFor(note.id)} activeOpacity={0.8}>
+                    <Text style={[styles.addItemBtnTxt, { color: accent }]}>+ Add item</Text>
+                  </TouchableOpacity>
+                )}
               </View>
-            </View>
-            <View style={styles.cardProgTrack}>
-              <View style={[styles.cardProgFill, { backgroundColor: task.progressColor, width: '100%' }]} />
-            </View>
-          </View>
-        ))}
-
-        <View style={{ height: 100 }} />
-      </ScrollView>
-
-      {/* FAB */}
-      <TouchableOpacity style={styles.fab} activeOpacity={0.85}>
-        <Text style={styles.fabIcon}>+</Text>
-      </TouchableOpacity>
+            );
+          })}
+          <View style={{ height: 100 }} />
+        </ScrollView>
+      )}
     </SafeAreaView>
   );
 }
@@ -168,103 +149,42 @@ export default function TasksScreen() {
 const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: COLORS.bg },
   scroll: { flex: 1 },
-  content: { paddingTop: Platform.OS === 'web' ? 20 : 0 },
-
+  content: { paddingHorizontal: 20, paddingTop: 8, paddingBottom: 40 },
   header: {
-    flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between',
-    paddingHorizontal: 24, paddingTop: 20, paddingBottom: 8,
+    flexDirection: 'row', alignItems: 'baseline', justifyContent: 'space-between',
+    paddingHorizontal: 24, paddingTop: Platform.OS === 'web' ? 24 : 16, paddingBottom: 16,
   },
-  headerTitle: { fontSize: 24, fontWeight: '700', color: COLORS.text },
-  headerDate: { fontSize: 13, color: COLORS.textMuted, marginTop: 2 },
-  headerRight: { flexDirection: 'row', gap: 10 },
-  iconBtn: {
-    width: 36, height: 36, borderRadius: 18,
-    backgroundColor: COLORS.surface, alignItems: 'center', justifyContent: 'center',
-    ...SHADOW.light,
-  },
-  headerIcon: { width: 18, height: 18, tintColor: COLORS.textMuted },
-
-  progressBanner: {
-    marginHorizontal: 24, marginVertical: 14,
-    backgroundColor: COLORS.green, borderRadius: RADIUS.lg,
-    padding: 18, flexDirection: 'row', alignItems: 'center', gap: 16,
-  },
-  bannerLeft: { flex: 1 },
-  bannerTitle: { fontSize: 16, fontWeight: '700', color: '#fff', marginBottom: 4 },
-  bannerSub: { fontSize: 12, color: 'rgba(255,255,255,0.85)', marginBottom: 10 },
-  progTrack: { height: 6, backgroundColor: 'rgba(255,255,255,0.3)', borderRadius: 3, overflow: 'hidden' },
-  progFill: { height: '100%', backgroundColor: '#fff', borderRadius: 3 },
-  bannerRight: { alignItems: 'center' },
-  bannerPct: { fontSize: 24, fontWeight: '700', color: '#fff' },
-  bannerDone: { fontSize: 11, color: 'rgba(255,255,255,0.8)' },
-
-  filterScroll: { marginBottom: 8 },
-  filterContent: { paddingHorizontal: 24, gap: 8, paddingBottom: 12 },
-  filterChip: {
-    paddingHorizontal: 16, paddingVertical: 7, borderRadius: RADIUS.full,
-    backgroundColor: COLORS.surface, borderWidth: 1.5, borderColor: COLORS.border,
-  },
-  filterChipActive: { backgroundColor: COLORS.accent, borderColor: COLORS.accent },
-  filterTxt: { fontSize: 12, fontWeight: '500', color: COLORS.textMuted },
-  filterTxtActive: { color: '#fff' },
-
-  sectionHeader: {
-    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-    paddingHorizontal: 24, marginBottom: 12,
-  },
-  sectionLabel: {
-    fontSize: 12, fontWeight: '600', color: COLORS.textMuted,
-    textTransform: 'uppercase', letterSpacing: 0.8,
-  },
-  sectionCount: { fontSize: 12, color: COLORS.accent, fontWeight: '500' },
-
-  taskCard: {
-    marginHorizontal: 24, marginBottom: 14,
-    backgroundColor: COLORS.surface, borderRadius: RADIUS.lg,
-    padding: 18, ...SHADOW.card,
-  },
-  cardHeader: {
-    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14,
-  },
-  cardTitle: { fontSize: 15, fontWeight: '700', color: COLORS.text, flex: 1 },
-  badge: { paddingHorizontal: 10, paddingVertical: 3, borderRadius: RADIUS.full },
-  badgeTxt: { fontSize: 11, fontWeight: '600' },
-
-  cardProgRow: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 6 },
-  cardProgLbl: { fontSize: 11, color: COLORS.textMuted },
-  cardProgTrack: {
-    height: 4, backgroundColor: COLORS.border, borderRadius: 2, overflow: 'hidden', marginBottom: 14,
-  },
-  cardProgFill: { height: '100%', borderRadius: 2 },
-
-  checkRow: {
-    flexDirection: 'row', alignItems: 'flex-start', gap: 12,
-    padding: 10, borderRadius: RADIUS.sm, backgroundColor: 'rgba(44,36,22,0.03)', marginBottom: 8,
-  },
-  checkRowDone: { backgroundColor: 'rgba(123,171,139,0.08)' },
-  checkbox: {
-    width: 20, height: 20, borderRadius: 5, borderWidth: 2,
-    borderColor: COLORS.border, alignItems: 'center', justifyContent: 'center', marginTop: 2,
-  },
-  checkboxDone: { backgroundColor: COLORS.green, borderColor: COLORS.green },
+  screenTitle: { fontSize: 26, fontWeight: '700', color: COLORS.text },
+  screenSub: { fontSize: 13, color: COLORS.textMuted },
+  emptyState: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 40 },
+  emptyIcon: { fontSize: 48, marginBottom: 12 },
+  emptyTxt: { fontSize: 17, fontWeight: '600', color: COLORS.text, marginBottom: 6 },
+  emptyHint: { fontSize: 13, color: COLORS.textMuted, textAlign: 'center', marginBottom: 24 },
+  emptyBtn: { backgroundColor: COLORS.accent, borderRadius: RADIUS.full, paddingHorizontal: 22, paddingVertical: 12 },
+  emptyBtnTxt: { color: '#fff', fontWeight: '600', fontSize: 14 },
+  card: { backgroundColor: COLORS.surface, borderRadius: RADIUS.lg, padding: 18, marginBottom: 16, ...SHADOW.card },
+  cardHeader: { flexDirection: 'row', alignItems: 'flex-start', marginBottom: 12 },
+  cardTitle: { fontSize: 15, fontWeight: '700', color: COLORS.text, marginBottom: 6 },
+  cardMeta: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  catBadge: { paddingHorizontal: 9, paddingVertical: 3, borderRadius: RADIUS.full },
+  catBadgeTxt: { fontSize: 10, fontWeight: '600' },
+  metaDate: { fontSize: 11, color: COLORS.textMuted },
+  progressPct: { fontSize: 16, fontWeight: '700', width: 48, textAlign: 'right' },
+  progressBarBg: { height: 6, backgroundColor: COLORS.border, borderRadius: 3, marginBottom: 6, overflow: 'hidden' },
+  progressBarFill: { height: 6, borderRadius: 3 },
+  progressLabel: { fontSize: 11, color: COLORS.textMuted, marginBottom: 14 },
+  itemsList: { gap: 2 },
+  itemRow: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 7 },
+  checkbox: { width: 20, height: 20, borderRadius: 5, borderWidth: 2, borderColor: COLORS.border, alignItems: 'center', justifyContent: 'center' },
   checkMark: { color: '#fff', fontSize: 11, fontWeight: '700' },
-  checkBody: { flex: 1 },
-  checkTxt: { fontSize: 13, color: COLORS.text, lineHeight: 20 },
-  checkTxtDone: { textDecorationLine: 'line-through', color: COLORS.textMuted },
-  checkSub: { fontSize: 11, color: COLORS.textMuted, marginTop: 2 },
-
-  addItem: {
-    padding: 10, borderRadius: RADIUS.sm,
-    borderWidth: 1.5, borderStyle: 'dashed', borderColor: COLORS.border, marginTop: 4,
-  },
-  addItemTxt: { fontSize: 13, color: COLORS.textMuted },
-
-  fab: {
-    position: 'absolute', bottom: Platform.OS === 'web' ? 80 : 100,
-    right: 24, width: 56, height: 56, borderRadius: 28,
-    backgroundColor: COLORS.green, alignItems: 'center', justifyContent: 'center',
-    shadowColor: COLORS.green, shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.40, shadowRadius: 12, elevation: 8,
-  },
-  fabIcon: { color: '#fff', fontSize: 28, fontWeight: '300', lineHeight: 32 },
+  itemText: { fontSize: 13, color: COLORS.text, flex: 1, lineHeight: 20 },
+  itemTextDone: { textDecorationLine: 'line-through', color: COLORS.textMuted },
+  addInputRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 10 },
+  addInput: { flex: 1, fontSize: 13, color: COLORS.text, borderBottomWidth: 1.5, borderBottomColor: COLORS.accent, paddingVertical: 6, paddingHorizontal: 2 },
+  addConfirmBtn: { paddingHorizontal: 14, paddingVertical: 7, borderRadius: RADIUS.sm },
+  addConfirmTxt: { color: '#fff', fontSize: 12, fontWeight: '600' },
+  addCancelBtn: { padding: 6 },
+  addCancelTxt: { fontSize: 14, color: COLORS.textMuted },
+  addItemBtn: { marginTop: 10, paddingVertical: 8, alignItems: 'center' },
+  addItemBtnTxt: { fontSize: 13, fontWeight: '600' },
 });
